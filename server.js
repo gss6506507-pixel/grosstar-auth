@@ -9,12 +9,14 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 app.use(express.json({ limit: '64kb' }));
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'troque-isso';
+const AUTH_SECRET = process.env.AUTH_SECRET || 'troque-este-secret-32-chars-min';
 const DB_FILE = path.join(__dirname, 'keys.json');
 
 function loadDB() {
@@ -29,6 +31,11 @@ if (!fs.existsSync(DB_FILE)) saveDB({ keys: [] });
 
 function findKey(db, key) {
   return db.keys.find(k => k.key === key);
+}
+
+function sign(key, hwid, expires_at) {
+  return crypto.createHmac('sha256', AUTH_SECRET)
+    .update(key + '|' + (hwid || '') + '|' + (expires_at || '')).digest('hex');
 }
 
 app.get('/', (req, res) => res.json({ ok: true, service: 'grosstar-auth' }));
@@ -49,14 +56,17 @@ function checkAuth(key, hwid) {
 app.post('/auth', (req, res) => {
   const { key, hwid } = req.body || {};
   if (!key) return res.json({ ok: false, reason: 'missing key' });
-  res.json(checkAuth(String(key).trim(), hwid ? String(hwid) : null));
+  const r = checkAuth(String(key).trim(), hwid ? String(hwid) : null);
+  if (r.ok) r.sig = sign(String(key).trim(), hwid ? String(hwid) : null, r.expires_at);
+  res.json(r);
 });
 
 app.post('/heartbeat', (req, res) => {
   const { key, hwid } = req.body || {};
   if (!key) return res.json({ ok: false });
   const r = checkAuth(String(key).trim(), hwid ? String(hwid) : null);
-  res.json({ ok: r.ok });
+  if (!r.ok) return res.json({ ok: false });
+  res.json({ ok: true, expires_at: r.expires_at, sig: sign(String(key).trim(), hwid ? String(hwid) : null, r.expires_at) });
 });
 
 function needAdmin(req, res) {

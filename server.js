@@ -40,6 +40,8 @@ function sign(key, hwid, expires_at) {
 
 app.get('/', (req, res) => res.json({ ok: true, service: 'grosstar-auth' }));
 
+app.get('/panel', (req, res) => res.send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GROSSTAR admin</title><style>body{font-family:system-ui;background:#0e0f13;color:#eee;max-width:760px;margin:24px auto;padding:0 16px}input,button{padding:10px;border-radius:8px;border:1px solid #333;background:#17181d;color:#eee}button{background:#e686e0;border:0;color:#111;font-weight:700;cursor:pointer}table{width:100%;border-collapse:collapse;margin-top:12px}td,th{border-bottom:1px solid #222;padding:8px;font-size:13px}code{background:#17181d;padding:2px 6px;border-radius:6px}</style></head><body><h2>GROSSTAR keys</h2><div><input id="admin" type="password" placeholder="ADMIN_TOKEN" style="width:60%"> <button onclick="load()">Listar</button> <button onclick="gen()">Gerar key 30d</button></div><div id="out"></div><table><thead><tr><th>Key</th><th>HWID</th><th>Expira</th><th>Ban</th><th></th></tr></thead><tbody id="tb"></tbody></table><script>const api='';async function call(p,b){const r=await fetch(api+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return r.json()}const A=()=>document.getElementById('admin').value;async function load(){const j=await call('/admin/list',{admin:A()});if(!j.ok){document.getElementById('out').textContent='Token invalido';return}document.getElementById('tb').innerHTML=j.keys.map(k=>'<tr><td><code>'+k.key+'</code></td><td>'+k.hwid+'</td><td>'+(k.expires_at||'-')+'</td><td>'+(k.banned?'SIM':'')+'</td><td><button onclick="resetK(\\''+k.key+'\\')">Reset HWID</button> <button onclick="banK(\\''+k.key+'\\')">Ban</button></td></tr>').join('')}async function gen(){const j=await call('/admin/generate',{admin:A(),days:30});document.getElementById('out').textContent=j.ok?('Nova key: '+j.key):'Erro';load()}async function resetK(k){await call('/admin/reset',{admin:A(),key:k});load()}async function banK(k){if(confirm('Banir '+k+'?')){await call('/admin/ban',{admin:A(),key:k});load()}}</script></body></html>`));
+
 function checkAuth(key, hwid) {
   const db = loadDB();
   const rec = findKey(db, key);
@@ -106,5 +108,3 @@ app.post('/admin/reset', (req, res) => {
   rec.hwid = null; saveDB(db);
   res.json({ ok: true });
 });
-
-app.listen(PORT, () => console.log('grosstar-auth on :' + PORT));

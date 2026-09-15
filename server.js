@@ -108,3 +108,29 @@ app.post('/admin/reset', (req, res) => {
   rec.hwid = null; saveDB(db);
   res.json({ ok: true });
 });
+
+app.post('/admin/list', (req, res) => {
+  if (!needAdmin(req, res)) return;
+  const db = loadDB();
+  res.json({ ok: true, keys: db.keys.map(k => ({ key: k.key, hwid: k.hwid ? 'bound' : 'free', expires_at: k.expires_at, banned: !!k.banned })) });
+});
+
+function genKey() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const grp = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return `GROSSTAR-${grp()}-${grp()}-${grp()}-${grp()}`;
+}
+
+app.post('/admin/generate', (req, res) => {
+  if (!needAdmin(req, res)) return;
+  const days = Number(req.body.days || 30);
+  const db = loadDB();
+  let key;
+  do { key = genKey(); } while (findKey(db, key));
+  const exp = new Date(Date.now() + days * 864e5).toISOString();
+  db.keys.push({ key, hwid: null, expires_at: exp, banned: false });
+  saveDB(db);
+  res.json({ ok: true, key, expires_at: exp });
+});
+
+app.listen(PORT, () => console.log('grosstar-auth on :' + PORT));
